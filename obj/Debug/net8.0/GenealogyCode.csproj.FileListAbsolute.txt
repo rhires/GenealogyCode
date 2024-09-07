@@ -1,0 +1,14 @@
+/Users/russellhires/GenealogyCode/bin/Debug/net8.0/GenealogyCode
+/Users/russellhires/GenealogyCode/bin/Debug/net8.0/GenealogyCode.deps.json
+/Users/russellhires/GenealogyCode/bin/Debug/net8.0/GenealogyCode.runtimeconfig.json
+/Users/russellhires/GenealogyCode/bin/Debug/net8.0/GenealogyCode.dll
+/Users/russellhires/GenealogyCode/bin/Debug/net8.0/GenealogyCode.pdb
+/Users/russellhires/GenealogyCode/obj/Debug/net8.0/GenealogyCode.GeneratedMSBuildEditorConfig.editorconfig
+/Users/russellhires/GenealogyCode/obj/Debug/net8.0/GenealogyCode.AssemblyInfoInputs.cache
+/Users/russellhires/GenealogyCode/obj/Debug/net8.0/GenealogyCode.AssemblyInfo.cs
+/Users/russellhires/GenealogyCode/obj/Debug/net8.0/GenealogyCode.csproj.CoreCompileInputs.cache
+/Users/russellhires/GenealogyCode/obj/Debug/net8.0/GenealogyCode.dll
+/Users/russellhires/GenealogyCode/obj/Debug/net8.0/refint/GenealogyCode.dll
+/Users/russellhires/GenealogyCode/obj/Debug/net8.0/GenealogyCode.pdb
+/Users/russellhires/GenealogyCode/obj/Debug/net8.0/GenealogyCode.genruntimeconfig.cache
+/Users/russellhires/GenealogyCode/obj/Debug/net8.0/ref/GenealogyCode.dll
