@@ -12,3 +12,4 @@
 /Users/russellhires/GenealogyCode/obj/Debug/net8.0/GenealogyCode.pdb
 /Users/russellhires/GenealogyCode/obj/Debug/net8.0/GenealogyCode.genruntimeconfig.cache
 /Users/russellhires/GenealogyCode/obj/Debug/net8.0/ref/GenealogyCode.dll
+/Users/russellhires/GenealogyCode/obj/Debug/net8.0/GenealogyCode.sourcelink.json

@@ -13,7 +13,7 @@ public class Person
     public string? BirthLocation { get; set; }
     public string? DeathLocation { get; set; }
 
-    public string? SpouseName { get; set; }
+    public List<string>? SpouseName { get; set; }
 
     public List<string> Children { get; set; } = [];
 
