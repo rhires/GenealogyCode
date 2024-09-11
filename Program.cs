@@ -1,4 +1,5 @@
 ﻿
+using System.Linq.Expressions;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -11,16 +12,16 @@ internal partial class Program
     private static async Task Main(string[] args)
     {
         var theFile = await File.ReadAllLinesAsync($"../Documents/Genealogy/{Chapter}");
-        var i = 7;
+        var i = 0;
+
 
         List<Person> people = [];
         List<Family> families = [];
-        var familyNumber = 0;
+        var familyNumber = 1;
         var marriageDate = "";
         foreach (var line in theFile)
         {
             var person = new Person();
-
             if (GetGen().IsMatch(line))
             {
                 person.Indi = $"@I{i}@ INDI";
@@ -67,36 +68,31 @@ internal partial class Program
                 {
                     string ss;
                     if (indexNumbers.IndexOf(item) == indexNumbers.Count - 1) 
-                    {
                         ss = line.Substring(item, line.Length - item);
-                    }
                     else 
-                    {
-                        ss = line.Substring(item, indexNumbers[marriageNumber] - item);
-                    }
+                        ss = line.Substring(item, indexNumbers[marriageNumber - 1] - item);
 
                     var ssArray = ss.Split([',']);
                     ssArray[0] = ssArray[0].Replace($"({marriageNumber}) ", "");
                     var marriageDateIndex = ssArray[0].AsSpan().IndexOfAny(s_myChars); 
                     if (marriageDateIndex > 0)
                     {
-                        if (ssArray[0].Contains("ABT"))
-                        {
-                            marriageDate = ssArray[0].Substring(marriageDateIndex - 4).TrimEnd();
-                            person.SpouseName.Add(ssArray[0].Substring(0, marriageDateIndex - 4).TrimEnd());
-                        }
-                        else 
-                        {
-                            marriageDate = ssArray[0].Substring(marriageDateIndex).Replace(",", "");
-                            person.SpouseName.Add(ssArray[0].Substring(0, marriageDateIndex).Replace(",", "").TrimEnd());
-                        }
-                        if (marriageDate.Contains("29 FEB 1904")) {
-                            var tm = 5;
-                        }
+                        var abtIndex = ssArray[0].Contains("ABT") ? 4 : 0;
+
+                        marriageDate = ssArray[0].Substring(marriageDateIndex - abtIndex).TrimEnd();
+                        person.SpouseName.Add(ssArray[0].Substring(0, marriageDateIndex - abtIndex).TrimEnd());                        
                     }
                     else 
                     {
                         person.SpouseName.Add(ssArray[0].Replace(",", "").TrimEnd());
+                    }
+
+                    var spouse = GetFullName(person.SpouseName[0], new Person());
+                    spouse.Indi = $"@S{i}-{marriageNumber}@ INDI";
+                    if (!string.IsNullOrEmpty(person.Sex))
+                    {
+                        if (person.Sex == "M") spouse.Sex = "F";
+                        else if (person.Sex == "F") spouse.Sex = "M";
                     }
                     var index = ssArray.TakeWhile(t => !t.Contains("born")).Count();
                     if (index < ssArray.Length) 
@@ -106,15 +102,9 @@ internal partial class Program
                         {
                             var birthDateIndex = wasBorn.AsSpan().IndexOfAny(s_myChars);
                             if (birthDateIndex > 0)
-                            {
-                                if (wasBorn.Contains("ABT"))
-                                {
-                                    person.IncompleteBirthDate = wasBorn.Substring(birthDateIndex - 4).Replace(",", "");
-                                }
-                                else
-                                {
-                                    person.IncompleteBirthDate = wasBorn.Substring(birthDateIndex).Replace(",", "");
-                                }
+                            { 
+                                var abtIndex = wasBorn.Contains("ABT") ? 4 : 0;
+                                spouse.IncompleteBirthDate = wasBorn.Substring(birthDateIndex - abtIndex).Replace(",", "");
                             }
                         }
                     }
@@ -125,28 +115,32 @@ internal partial class Program
                         var deathDateIndex = died.AsSpan().IndexOfAny(s_myChars);
                         if (deathDateIndex > 0)
                         {
-                            if (died.Contains("ABT"))
-                            {
-                                person.IncompleteDeathDate = died.Substring(deathDateIndex - 4).Replace(",", "");
-                            }
-                            else
-                            {
-                                person.IncompleteDeathDate = died.Substring(deathDateIndex).Replace(",", "");
-                            }
+                            var abtIndex = died.Contains("ABT") ? 4 : 0;
+                            spouse.IncompleteDeathDate = died.Substring(deathDateIndex - abtIndex).Replace(",", "");
                         }
                     }
                     index = ssArray.TakeWhile(t => !t.Contains("died")).Count();
                     if (index == ssArray.Length)
                     {
-                        person.DeathLocation = "";
+                        spouse.DeathLocation = "";
                     }
                     else if (index + 1 < ssArray.Length)
                     {
-                        person.DeathLocation = ssArray[index + 1].TrimStart().TrimEnd();
+                        spouse.DeathLocation = ssArray[index + 1].TrimStart().TrimEnd();
                     }
+                    var children = GetChildren(line, i, theFile, marriageNumber);
+                    familyNumber++;
                     
-                    marriageNumber++;
+                    foreach (var child in children)
+                        person.Children.Add($"{child} F{familyNumber}"); 
+                    
+                    person.FamilySpouse = $"1 FAMS @F{familyNumber}@";
+                    spouse.FamilySpouse = $"1 FAMS @F{familyNumber}@";
+                    people.Add(spouse);
 
+                    families.Add(CreateFamily(line, person, familyNumber, spouse.Indi, marriageDate));
+
+                    marriageNumber++;
                 }
             }    
 
@@ -186,10 +180,10 @@ internal partial class Program
                     else if (person.Sex == "F") spouse.Sex = "M";
                 }
                 var lineArray = line.Split(",").ToList();
-                var indexM = lineArray.FindIndex(x=> x.Contains(" married"));
+                var indexM = lineArray.FindIndex(x => x.Contains("married"));
                 for (var j = indexM; j < lineArray.Count; j++) 
                     if (indexM > 0 && !string.IsNullOrEmpty(lineArray[j]))
-                        if (lineArray[j].Contains("was born"))
+                        if (lineArray[j].Contains("born"))
                         {
                             var bornIndex = lineArray[j].IndexOf("born");
                             spouse.IncompleteBirthDate = lineArray[j].Substring(bornIndex + 4).Trim();
@@ -202,6 +196,7 @@ internal partial class Program
 
                 familyNumber++;
                 spouse.FamilySpouse = $"1 FAMS @F{familyNumber}@";
+                person.FamilySpouse = $"1 FAMS @F{familyNumber}@";
                 people.Add(spouse);
                 families.Add(CreateFamily(line, person, familyNumber, spouseIndi: $"@S{i}@ INDI", marriageDate));
             }
@@ -212,6 +207,7 @@ internal partial class Program
         
         Console.WriteLine(i);
         Console.WriteLine(people.Count);
+        
         foreach (var person in people)
         {
             foreach (var child in person.Children)
@@ -220,17 +216,16 @@ internal partial class Program
                 var myPerson = people.FirstOrDefault(x => x.Indi!.Contains(indi));
                 if (myPerson != null)
                 {
-                    var fs = person?.FamilySpouse?.Replace("1 FAMS @", "");
-                    myPerson.FamilyChildren = $"1 FAMC @{fs}";
+                    var fs = person?.FamilySpouse?.Replace("1 FAMS @F", "");
+                    myPerson.FamilyChildren = $"1 FAMC @F{fs}";
                 }
             }
         }
+        
         ProduceGedcom(people, families);
-        
-        
     }
 
-    public static List<string> GetChildren(string line, int currentIndex, string[] theFile)
+    public static List<string> GetChildren(string line, int currentIndex, string[] theFile, int marriageNumber = 0)
     {
         var currentLevel = GetGen().Match(line).Value.Count(Char.IsWhiteSpace);
         List<string> children = [];
@@ -239,7 +234,9 @@ internal partial class Program
         {
             return [];
         }
+        
         var nextLine = theFile[currentIndex + i];
+
         var nextLevel = GetGen().Match(nextLine).Value.Count(Char.IsWhiteSpace);
         var last = theFile.Last();
         
@@ -247,9 +244,12 @@ internal partial class Program
         {
             nextLine = theFile[currentIndex + i];
             nextLevel = GetGen().Match(nextLine).Value.Count(Char.IsWhiteSpace);
-           
+            
             if (nextLevel == currentLevel + 4)
-                children.Add($"1 CHIL @I{currentIndex + i}@");
+                {
+                    if (nextLine.Contains($". ({marriageNumber})") || marriageNumber == 0)
+                        children.Add($"1 CHIL @I{currentIndex + i}@");
+                }
             i++;
         }
         return children;
@@ -295,13 +295,24 @@ internal partial class Program
         };
         var children = person.Children;
         family.Children = [];
-        
-        foreach (var child in children)
+        if (children.Any(x => x.Contains($"F{familyNumber}")))
         {
-            family.Children.Add(child);
+            children = children.Where(x => x.Contains($"F{familyNumber}")).ToList();
         }
-        
-        return family;
+        try
+        {foreach (var child in children)
+        {
+            var theChild = child;
+            theChild = theChild.Replace($"F{familyNumber}", "");
+            family.Children.Add(theChild);
+        }        
+}        
+catch (Exception ex)
+{
+    var exc = ex;
+}
+
+return family;
     }
     public static (DateOnly?,string) GetLocation(string line)
     {
