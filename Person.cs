@@ -21,7 +21,7 @@ public class Person
     public int? DarNumber { get; set; }
     public string? Indi { get; set; }
     public string? Sex { get; set; }
-    public string? FamilySpouse { get; set; }
+    public List<string>? FamilySpouse { get; set; }
     public string? FamilyChildren { get; set; }
 
 }

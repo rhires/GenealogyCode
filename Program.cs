@@ -86,7 +86,9 @@ internal partial class Program
                     {
                         person.SpouseName.Add(ssArray[0].Replace(",", "").TrimEnd());
                     }
-
+if (person.FullName.Contains("Lois M.")){
+    var tmo = true;
+}
                     var spouse = GetFullName(person.SpouseName[0], new Person());
                     spouse.Indi = $"@S{i}-{marriageNumber}@ INDI";
                     if (!string.IsNullOrEmpty(person.Sex))
@@ -130,12 +132,16 @@ internal partial class Program
                     }
                     var children = GetChildren(line, i, theFile, marriageNumber);
                     familyNumber++;
-                    
+                    if (i == 145)
+                    {
+                        string stop = "stop";
+                    }
                     foreach (var child in children)
                         person.Children.Add($"{child} F{familyNumber}"); 
-                    
-                    person.FamilySpouse = $"1 FAMS @F{familyNumber}@";
-                    spouse.FamilySpouse = $"1 FAMS @F{familyNumber}@";
+                    person.FamilySpouse ??= [];
+                    person.FamilySpouse.Add($"1 FAMS @F{familyNumber}@");
+                    spouse.FamilySpouse = [];
+                    spouse.FamilySpouse.Add($"1 FAMS @F{familyNumber}@");
                     people.Add(spouse);
 
                     families.Add(CreateFamily(line, person, familyNumber, spouse.Indi, marriageDate));
@@ -195,8 +201,11 @@ internal partial class Program
                         }
 
                 familyNumber++;
-                spouse.FamilySpouse = $"1 FAMS @F{familyNumber}@";
-                person.FamilySpouse = $"1 FAMS @F{familyNumber}@";
+                
+                spouse.FamilySpouse = [];
+                spouse.FamilySpouse.Add($"1 FAMS @F{familyNumber}@");
+                person.FamilySpouse = [];
+                person.FamilySpouse.Add($"1 FAMS @F{familyNumber}@");
                 people.Add(spouse);
                 families.Add(CreateFamily(line, person, familyNumber, spouseIndi: $"@S{i}@ INDI", marriageDate));
             }
@@ -210,13 +219,17 @@ internal partial class Program
         
         foreach (var person in people)
         {
+            if (person.FullName == "Ronnie /Mims/")
+            {
+                var tm = "tell me";
+            }
             foreach (var child in person.Children)
             {
                 var indi = child.Replace("1 CHIL ", "");
                 var myPerson = people.FirstOrDefault(x => x.Indi!.Contains(indi));
                 if (myPerson != null)
                 {
-                    var fs = person?.FamilySpouse?.Replace("1 FAMS @F", "");
+                    var fs = person?.FamilySpouse[0]?.Replace("1 FAMS @F", "");
                     myPerson.FamilyChildren = $"1 FAMC @F{fs}";
                 }
             }
@@ -452,9 +465,10 @@ return family;
             {
                 outputFile.WriteLine($"2 PLAC {pers.DeathLocation}");
             }
-            if (!string.IsNullOrEmpty(pers.FamilySpouse))
+            if (!string.IsNullOrEmpty(pers.FamilySpouse?[0]))
             {
-                outputFile.WriteLine(pers.FamilySpouse);
+                foreach (var fs in pers.FamilySpouse)
+                    outputFile.WriteLine(fs);
             }
             if (!string.IsNullOrEmpty(pers.FamilyChildren))
             {
