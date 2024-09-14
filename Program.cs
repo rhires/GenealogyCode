@@ -1,5 +1,6 @@
 ﻿
 using System.Linq.Expressions;
+using System.Net.NetworkInformation;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -8,12 +9,12 @@ using GenealogyCode;
 internal partial class Program
 {
     private static readonly System.Buffers.SearchValues<char> s_myChars = System.Buffers.SearchValues.Create("0123456789");
-    public static string Chapter { get; set;} = "chapter8";
+    
+    public static string Chapter { get; set;} = "chapter6";
     private static async Task Main(string[] args)
     {
         var theFile = await File.ReadAllLinesAsync($"../Documents/Genealogy/{Chapter}");
         var i = 0;
-
 
         List<Person> people = [];
         List<Family> families = [];
@@ -30,25 +31,9 @@ internal partial class Program
             person = GetFullName(line, person);
             var sex = GetSex().Match(line).Value;
             person.Sex = sex != "" ? sex.Substring(1,2).Trim() : "";
-            var (dateonly, partialDate) = IsValidDate(line, "born");
-            if (dateonly is not null && string.IsNullOrEmpty(partialDate)) 
-            {
-                person.CompleteBirthDate = dateonly.Value;
-            }
-            else if (dateonly is null && !string.IsNullOrEmpty(partialDate))
-            {
-                person.IncompleteBirthDate = partialDate;
-            }
-            var location = GetLocation(line);
-            (dateonly, partialDate) = IsValidDate(line, "died");
-            if (dateonly is not null && string.IsNullOrEmpty(partialDate)) 
-            {
-                person.CompleteDeathDate = dateonly.Value;
-            }
-            else if (dateonly is null && !string.IsNullOrEmpty(partialDate))
-            {
-                person.IncompleteDeathDate = partialDate;
-            }
+            
+            person.IncompleteBirthDate = GetDate(line, "born");;
+            person.IncompleteDeathDate = GetDate(line, "died");;
 
             int marriageNumber = 1; 
             List<int> indexNumbers = [];
@@ -63,14 +48,16 @@ internal partial class Program
             if (indexNumbers.Count > 0)
             {
                 person.SpouseName = [];
-            
+                
                 foreach (var item in indexNumbers)
                 {
                     string ss;
                     if (indexNumbers.IndexOf(item) == indexNumbers.Count - 1) 
                         ss = line.Substring(item, line.Length - item);
                     else 
-                        ss = line.Substring(item, indexNumbers[marriageNumber - 1] - item);
+                        ss = 0 == indexNumbers[marriageNumber - 1] - item
+                            ? line.Substring(item, indexNumbers[marriageNumber] - item)
+                            : line.Substring(item, indexNumbers[marriageNumber - 1] - item);
 
                     var ssArray = ss.Split([',']);
                     ssArray[0] = ssArray[0].Replace($"({marriageNumber}) ", "");
@@ -86,10 +73,8 @@ internal partial class Program
                     {
                         person.SpouseName.Add(ssArray[0].Replace(",", "").TrimEnd());
                     }
-if (person.FullName.Contains("Lois M.")){
-    var tmo = true;
-}
-                    var spouse = GetFullName(person.SpouseName[0], new Person());
+
+                    var spouse = GetFullName(person.SpouseName[marriageNumber - 1], new Person());
                     spouse.Indi = $"@S{i}-{marriageNumber}@ INDI";
                     if (!string.IsNullOrEmpty(person.Sex))
                     {
@@ -130,14 +115,14 @@ if (person.FullName.Contains("Lois M.")){
                     {
                         spouse.DeathLocation = ssArray[index + 1].TrimStart().TrimEnd();
                     }
+                    
                     var children = GetChildren(line, i, theFile, marriageNumber);
+                    
                     familyNumber++;
-                    if (i == 145)
-                    {
-                        string stop = "stop";
-                    }
+                    
                     foreach (var child in children)
                         person.Children.Add($"{child} F{familyNumber}"); 
+                    
                     person.FamilySpouse ??= [];
                     person.FamilySpouse.Add($"1 FAMS @F{familyNumber}@");
                     spouse.FamilySpouse = [];
@@ -152,56 +137,11 @@ if (person.FullName.Contains("Lois M.")){
 
             else if (MarriedInfo().IsMatch(line))
             {
-                var marriedInfo = MarriedInfo().Match(line).Value.TrimEnd();
-                
-                marriedInfo = marriedInfo.Replace("married ", "").Trim();
-                var marriages = new List<Marriage>();
-                int index = marriedInfo.AsSpan().IndexOfAny(s_myChars);
-                person.SpouseName = [];
-                person.Children = GetChildren(line, i, theFile);
-                marriageDate = "";
-                if (index > 0)
-                {
-                    if (marriedInfo.Contains("ABT"))
-                    {
-                        marriageDate = marriedInfo.Substring(index - 4).Replace(",", "").TrimEnd();
-                        person.SpouseName.Add(marriedInfo.Substring(0, index - 4).Replace(",", "").TrimEnd());
-                    }
-                    else 
-                    {
-                        marriageDate = marriedInfo.Substring(index).Replace(",", "");
-                        person.SpouseName.Add(marriedInfo.Substring(0, index).Replace(",", "").TrimEnd());
-                    }
-                } 
-                else 
-                {
-                    person.SpouseName.Add(marriedInfo);
-                }
-                    
-                var spouse = GetFullName(person.SpouseName[0], new Person());
-                spouse.Indi = $"@S{i}@ INDI";
-                if (!string.IsNullOrEmpty(person.Sex))
-                {
-                    if (person.Sex == "M") spouse.Sex = "F";
-                    else if (person.Sex == "F") spouse.Sex = "M";
-                }
-                var lineArray = line.Split(",").ToList();
-                var indexM = lineArray.FindIndex(x => x.Contains("married"));
-                for (var j = indexM; j < lineArray.Count; j++) 
-                    if (indexM > 0 && !string.IsNullOrEmpty(lineArray[j]))
-                        if (lineArray[j].Contains("born"))
-                        {
-                            var bornIndex = lineArray[j].IndexOf("born");
-                            spouse.IncompleteBirthDate = lineArray[j].Substring(bornIndex + 4).Trim();
-                        }
-                        else if (lineArray[j].Contains("died"))
-                        {   
-                            var diedIndex = lineArray[j].IndexOf("died");
-                            spouse.IncompleteDeathDate = lineArray[j].Substring(diedIndex + 4).Trim();
-                        }
+                Person spouse;
+                SingleMarriage(theFile, i, out marriageDate, line, person, out spouse);
 
                 familyNumber++;
-                
+
                 spouse.FamilySpouse = [];
                 spouse.FamilySpouse.Add($"1 FAMS @F{familyNumber}@");
                 person.FamilySpouse = [];
@@ -209,7 +149,7 @@ if (person.FullName.Contains("Lois M.")){
                 people.Add(spouse);
                 families.Add(CreateFamily(line, person, familyNumber, spouseIndi: $"@S{i}@ INDI", marriageDate));
             }
-            
+
             people.Add(person);   
             i++;
         }
@@ -217,25 +157,100 @@ if (person.FullName.Contains("Lois M.")){
         Console.WriteLine(i);
         Console.WriteLine(people.Count);
         
-        foreach (var person in people)
+        foreach (var person in people) //108, 109, 110
         {
-            if (person.FullName == "Ronnie /Mims/")
-            {
-                var tm = "tell me";
+            if (people.IndexOf(person) == 109){
+                Console.WriteLine(person);
             }
-            foreach (var child in person.Children)
+            if (person.FamilySpouse == null)
+                continue;
+            var allTheChildren = new List<string>();
+            foreach (var familySpouse in person.FamilySpouse)
             {
-                var indi = child.Replace("1 CHIL ", "");
-                var myPerson = people.FirstOrDefault(x => x.Indi!.Contains(indi));
-                if (myPerson != null)
+                if (familySpouse.StartsWith("1 FAMS @F36@")){
+                    var stop = true;
+                } 
+                if (person.FamilySpouse.Count() > 1)
+                    Console.WriteLine($"Person {person.Indi} has more than one spouse");    
+                var fs = familySpouse.Replace("1 FAMS @F", "").Replace("@", "");
+                var children = person.FamilySpouse.Count() > 1 
+                ? person.Children.Where(x => x.Contains($"F{fs}"))
+                : person.Children;
+                
+                foreach(var theChild in children)
                 {
-                    var fs = person?.FamilySpouse[0]?.Replace("1 FAMS @F", "");
-                    myPerson.FamilyChildren = $"1 FAMC @F{fs}";
+                    var childsIndi = theChild.Replace("1 CHIL ", "").Replace($" F{fs}", "");
+                    var personsChild = people.FirstOrDefault(x => x.Indi!.Contains(childsIndi));
+                    if (personsChild != null)
+                        personsChild.ChildOfFamily = $"1 FAMC @F{fs}@";
                 }
+                
+                foreach (var child in person.Children.Where(x => x.Contains($"F{fs}")))
+                {
+                    allTheChildren.Add(child.Replace($"F{fs}", "").Trim());
+                }
+            }
+            if (person.Children.Any(x => x.Contains("@I75@ F36")))
+                Console.WriteLine($"Person {person.Indi} has a child with a family that is not");
+            if (allTheChildren.Count() > 0 && person.FamilySpouse.Count() > 1)
+            {
+                person.Children = [];
+                person.Children.AddRange(allTheChildren);
             }
         }
         
         ProduceGedcom(people, families);
+    }
+
+    private static void SingleMarriage(string[] theFile, int i, out string marriageDate, string line, Person person, out Person spouse)
+    {
+        var marriedInfo = MarriedInfo().Match(line).Value.TrimEnd();
+
+        marriedInfo = marriedInfo.Replace("married ", "").Trim();
+        var marriages = new List<Marriage>();
+        int index = marriedInfo.AsSpan().IndexOfAny(s_myChars);
+        person.SpouseName = [];
+        person.Children = GetChildren(line, i, theFile);
+        marriageDate = "";
+        if (index > 0)
+        {
+            if (marriedInfo.Contains("ABT"))
+            {
+                marriageDate = marriedInfo.Substring(index - 4).Replace(",", "").TrimEnd();
+                person.SpouseName.Add(marriedInfo.Substring(0, index - 4).Replace(",", "").TrimEnd());
+            }
+            else
+            {
+                marriageDate = marriedInfo.Substring(index).Replace(",", "");
+                person.SpouseName.Add(marriedInfo.Substring(0, index).Replace(",", "").TrimEnd());
+            }
+        }
+        else
+        {
+            person.SpouseName.Add(marriedInfo);
+        }
+
+        spouse = GetFullName(person.SpouseName[0], new Person());
+        spouse.Indi = $"@S{i}@ INDI";
+        if (!string.IsNullOrEmpty(person.Sex))
+        {
+            if (person.Sex == "M") spouse.Sex = "F";
+            else if (person.Sex == "F") spouse.Sex = "M";
+        }
+        var lineArray = line.Split(",").ToList();
+        var indexM = lineArray.FindIndex(x => x.Contains("married"));
+        for (var j = indexM; j < lineArray.Count; j++)
+            if (indexM > 0 && !string.IsNullOrEmpty(lineArray[j]))
+                if (lineArray[j].Contains("born"))
+                {
+                    var bornIndex = lineArray[j].IndexOf("born");
+                    spouse.IncompleteBirthDate = lineArray[j].Substring(bornIndex + 4).Trim();
+                }
+                else if (lineArray[j].Contains("died"))
+                {
+                    var diedIndex = lineArray[j].IndexOf("died");
+                    spouse.IncompleteDeathDate = lineArray[j].Substring(diedIndex + 4).Trim();
+                }
     }
 
     public static List<string> GetChildren(string line, int currentIndex, string[] theFile, int marriageNumber = 0)
@@ -259,10 +274,10 @@ if (person.FullName.Contains("Lois M.")){
             nextLevel = GetGen().Match(nextLine).Value.Count(Char.IsWhiteSpace);
             
             if (nextLevel == currentLevel + 4)
-                {
-                    if (nextLine.Contains($". ({marriageNumber})") || marriageNumber == 0)
-                        children.Add($"1 CHIL @I{currentIndex + i}@");
-                }
+            {
+                if (nextLine.Contains($". ({marriageNumber}") || marriageNumber == 0)
+                    children.Add($"1 CHIL @I{currentIndex + i}@");
+            }
             i++;
         }
         return children;
@@ -274,16 +289,9 @@ if (person.FullName.Contains("Lois M.")){
         var family = new Family
         {
             Fam = $"0 @F{familyNumber}@ FAM",
+            IncompleteMarriedDate = GetDate(line, "married")
         };
-        var (dateonly, partialDate) = IsValidDate(line, "married");
-        if (dateonly is not null && string.IsNullOrEmpty(partialDate)) 
-        {
-            family.CompleteMarriedDate = dateonly.Value;
-        }
-        else if (dateonly is null && !string.IsNullOrEmpty(partialDate))
-        {
-            family.IncompleteMarriedDate = partialDate;
-        }
+
         if (person.Sex == "M")
         {
             family.Husband = $"1 HUSB {person.Indi}";
@@ -294,6 +302,7 @@ if (person.FullName.Contains("Lois M.")){
             family.Wife = $"1 WIFE {person.Indi}";
             family.Husband = $"1 HUSB {spouseIndi}";
         }
+        
         var lineArray = line.Split(",").ToList();
         var marriageLocation = lineArray.FindIndex(x => x.Contains(" married"));
         string marriagePlace = string.Empty;
@@ -308,70 +317,50 @@ if (person.FullName.Contains("Lois M.")){
         };
         var children = person.Children;
         family.Children = [];
-        if (children.Any(x => x.Contains($"F{familyNumber}")))
-        {
+        if (children.Any(x => x.Contains("F"))) 
             children = children.Where(x => x.Contains($"F{familyNumber}")).ToList();
-        }
+            
         try
-        {foreach (var child in children)
         {
-            var theChild = child;
-            theChild = theChild.Replace($"F{familyNumber}", "");
-            family.Children.Add(theChild);
+            foreach (var child in children)
+            {
+                var theChild = child;
+                theChild = theChild.Replace($"F{familyNumber}", "").Trim();
+                family.Children.Add(theChild);
+            }
+               
         }        
-}        
-catch (Exception ex)
-{
-    var exc = ex;
-}
-
-return family;
-    }
-    public static (DateOnly?,string) GetLocation(string line)
-    {
-        var locationindex = GetBirthDate().Match(line).Index;
-        if (locationindex > 0)
+        catch (Exception ex)
         {
-            int locationlength = GetBirthDate().Match(line).Length;
-            var hmmm = line.Substring(locationindex + locationlength).Trim();
+            var exc = ex;
         }
-        return (new DateOnly(), "string");
+
+        return family;
     }
-    public static (DateOnly?,string) IsValidDate(string line, string dateType)
+    
+    public static string GetDate(string line, string dateType)
     {
         string? date = string.Empty; 
-        string[] charsToRemove = [", born ", ",", "."];
         if (dateType.Contains("born"))
         {
-            date = GetBirthDate().Match(line).Value;
+            date = GetBirthDate().Match(line).Groups["date"].Value.TrimStart();
         }
         else if (dateType.Contains("died"))
         {
-            charsToRemove = [", died ", ",", "."];
-            date = GetDeathDate().Match(line).Value;
+            date = GetDeathDate().Match(line).Groups["date"].Value;
         }
         else if (dateType.Contains("married"))
         {
-            charsToRemove = [" married ", ",", "."];
             date = MarriedInfo().Match(line).Value;
             var index = date.AsSpan().IndexOfAny(s_myChars);
             if (index > 0)
+            {
                 date = date.Substring(index);
+                if (GetDate().IsMatch(date))
+                    date = GetDate().Match(date).Value;
+            }
         }
-        
-        foreach (var c in charsToRemove)
-        {
-            date = date.Replace(c, string.Empty);
-        }
-        
-        if (DateOnly.TryParse(date, out DateOnly result))
-        {
-            return (result, string.Empty);
-        }
-        else
-        {
-            return (null, date);
-        }            
+        return date;            
     }
     public static Person GetFullName(string line, Person person)
     {
@@ -390,27 +379,40 @@ return family;
         
         return person;
     }
-
-    
+//---  
+//---
+    [GeneratedRegex(@"(?<!\d) ((JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)) [0-9]{4}")]
+    private static partial Regex MonthYear();
+//---  
+//---
     [GeneratedRegex(@",\s[M|F],")]
     private static partial Regex GetSex();
-
+//---  
+//---
     [GeneratedRegex(@"^[0-9]{4}")]
     private static partial Regex IsYearOnly();
-
+//---  
+//---
     [GeneratedRegex(@"\s*[A-Za-z0-9]*")]
     private static partial Regex GetGen();
-
+//---  
+//---
     [GeneratedRegex(@"((?:^|\W)married(?:$|\W)[A-Za-z0-9\s(1)""\.]*\,\.)|(married (_*\s[A-Za-z\s]*)|married\s[A-Za-z0-9\s(1)""\._]*\W)")]
     private static partial Regex MarriedInfo();
-
-
-    [GeneratedRegex(@", born ([^,]*)(,|\.)")]
+//---  
+//---
+    [GeneratedRegex(@"(ABT|BEF|AFT)*((\d))* (JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)*\s*[0-9]{4}\b")]
+    private static partial Regex GetDate();
+//---  
+//---  
+    [GeneratedRegex(@"(?<! died)born *(?<date>(ABT|BEF|AFT|BET)*((\d))* (?<month>(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC))?\s*[0-9]{4}\b( AND [\w \d}]*)*)")]
     private static partial Regex GetBirthDate();
-
-    [GeneratedRegex(@", died ([^,]*)(,|\.)")]
+//---  
+//---
+    [GeneratedRegex(@"(?<! born)died *(?<date>(ABT|BEF|AFT|BET)*((\d))* (?<month>(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC))?\s*[0-9]{4}\b( AND [\w \d}]*)*)")]
     private static partial Regex GetDeathDate();
-
+//---  
+//---
     [GeneratedRegex(@"^\s*[A-Z]\.")]
     private static partial Regex GetName();
     public static void ProduceGedcom(List<Person> people, List<Family> families)
@@ -470,9 +472,9 @@ return family;
                 foreach (var fs in pers.FamilySpouse)
                     outputFile.WriteLine(fs);
             }
-            if (!string.IsNullOrEmpty(pers.FamilyChildren))
+            if (!string.IsNullOrEmpty(pers.ChildOfFamily))
             {
-                outputFile.WriteLine(pers.FamilyChildren);
+                outputFile.WriteLine(pers.ChildOfFamily);
             }
         }
 

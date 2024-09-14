@@ -22,6 +22,6 @@ public class Person
     public string? Indi { get; set; }
     public string? Sex { get; set; }
     public List<string>? FamilySpouse { get; set; }
-    public string? FamilyChildren { get; set; }
+    public string? ChildOfFamily { get; set; }
 
 }
