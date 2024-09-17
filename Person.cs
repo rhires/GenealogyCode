@@ -14,7 +14,7 @@ public class Person
     public string? DeathLocation { get; set; }
 
     public List<string>? SpouseName { get; set; }
-
+    public string? Suffix { get; set; }
     public List<string> Children { get; set; } = [];
 
     public List<string> Parents { get; set; } = [];

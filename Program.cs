@@ -322,7 +322,6 @@ internal partial class Program
                 theChild = theChild.Replace($"F{familyNumber}", "").Trim();
                 family.Children.Add(theChild);
             }
-               
         }        
         catch (Exception ex)
         {
@@ -360,17 +359,24 @@ internal partial class Program
     {
         var nameArray = line.Split(',');
         var name = nameArray[0].Trim();
+        
         if (name.Contains('.'))
         {
             name = name.Substring(name.IndexOf('.') + 1, name.Length - name.IndexOf('.') - 1).TrimStart();
         }
+        
+        if (GetSuffix().IsMatch(name))
+        {
+            var suffValue = GetSuffix().Match(name).Value;
+            name = name.Replace(suffValue, "").Replace("  ", " ").Trim();
+            person.Suffix = suffValue;
+        }
         var surnameArray = name.Split(" ");
         person.Surname = surnameArray.Last();
         var lastNameIndex = name.LastIndexOf(' ') + 1;
-        person.GivenName = name.Substring(0, lastNameIndex).Trim();
+        person.GivenName = name.Substring(0, lastNameIndex).Trim();       
         name = name.Insert(lastNameIndex, "/");
         person.FullName = name.Insert(name.Length, "/");
-        
         return person;
     }
 
@@ -401,17 +407,17 @@ internal partial class Program
         outputFile.WriteLine("2 CTRY USA");
         outputFile.WriteLine("1 EMAIL rhires@earthlink.net");
         
-
         foreach (var pers in people)
         {
             outputFile.WriteLine($"0 {pers.Indi}");
             outputFile.WriteLine($"1 NAME {pers.FullName?.Replace("(1C) ", "").Replace("(2C) ", "").Replace("(3C) ", "")}");
             outputFile.WriteLine($"2 GIVN {pers.GivenName?.Replace("(1C) ", "").Replace("(2C) ", "").Replace("(3C) ", "")}");
             outputFile.WriteLine($"2 SURN {pers.Surname}");
+            if (!string.IsNullOrEmpty(pers.Suffix))
+                outputFile.WriteLine($"2 NSFX {pers.Suffix}");
             if (!string.IsNullOrEmpty(pers.Sex))
-            {
                 outputFile.WriteLine($"1 SEX {pers.Sex}");
-            }
+            
             outputFile.WriteLine($"1 BIRT");
             if (pers.CompleteBirthDate != null)
             {
@@ -510,7 +516,7 @@ internal partial class Program
     private static partial Regex GetDeathDate();
 //---  
 //---
-    [GeneratedRegex(@"^\s*[A-Z]\.")]
-    private static partial Regex GetName();
+    [GeneratedRegex(@"(Jr)|(Sr)|(III)|(II)|(IV)")]
+    private static partial Regex GetSuffix();
 
 }

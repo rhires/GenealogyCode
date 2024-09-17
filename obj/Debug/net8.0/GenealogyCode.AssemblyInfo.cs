@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GenealogyCode")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3564e9a80d9291b40d69a78c6a10ea492aaaa257")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7282ce390790fcffd108ed53937763fce0c48f10")]
 [assembly: System.Reflection.AssemblyProductAttribute("GenealogyCode")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GenealogyCode")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
