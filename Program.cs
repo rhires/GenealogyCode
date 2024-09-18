@@ -26,12 +26,31 @@ internal partial class Program
             }
             string lineText = line.Substring(0, line.Length); //3, 7, 11, , 16
             person = GetFullName(line, person);
+            if (line.Contains("Greensby Weatherford Barber")){
+                Console.WriteLine("sure");
+            }
             var sex = GetSex().Match(line).Value;
             person.Sex = sex != "" ? sex.Substring(1,2).Trim() : "";
             
-            person.IncompleteBirthDate = GetDate(line, "born " );;
-            person.IncompleteDeathDate = GetDate(line, "died " );;
-
+            person.IncompleteBirthDate = GetDate(line, "born " );
+            var lineArray = line.Split(",").ToList();
+            var bIndex = lineArray.FindIndex(x => x.Contains(" born "));
+            if (bIndex != -1 && bIndex + 1 < lineArray.Count) 
+            {
+                if (lineArray[bIndex + 1].Contains('|')) 
+                {
+                    person.BirthLocation = lineArray[bIndex + 1].Replace("|", ",").TrimStart().TrimEnd(',');
+                }
+            }
+            person.IncompleteDeathDate = GetDate(line, "died " );
+            bIndex = lineArray.FindIndex(x => x.Contains(" died "));
+            if (bIndex != -1 && bIndex + 1 < lineArray.Count) 
+            {
+                if (lineArray[bIndex + 1].Contains('|')) 
+                {
+                    person.DeathLocation = lineArray[bIndex + 1].Replace("|", ",").TrimStart();
+                }
+            }
             int marriageNumber = 1; 
             List<int> indexNumbers = [];
             
@@ -59,7 +78,7 @@ internal partial class Program
                             ? line.Substring(item, indexNumbers[marriageNumber] - item)
                             : line.Substring(item, indexNumbers[marriageNumber - 1] - item);
 
-                    var ssArray = ss.Split([',']);
+                    var ssArray = ss.Split([',']).ToList();
                     ssArray[0] = ssArray[0].Replace($"({marriageNumber}) ", "");
                     bool isPartner = false;
                     var marriageDateIndex = GetDate().Match(ssArray[0]).Index;
@@ -85,10 +104,10 @@ internal partial class Program
                         if (person.Sex == "M") spouse.Sex = "F";
                         else if (person.Sex == "F") spouse.Sex = "M";
                     }
-                    var index = ssArray.TakeWhile(t => !t.Contains("born " )).Count();
-                    if (index < ssArray.Length) 
+                    var index = ssArray.TakeWhile(t => !t.Contains(" born " )).Count();
+                    if (index < ssArray.Count) 
                     {
-                        var wasBorn = ssArray.FirstOrDefault(x=> x.Contains("born " ));
+                        var wasBorn = ssArray.FirstOrDefault(x=> x.Contains(" born " ));
                         if (wasBorn != null)
                         {
                             var birthDateIndex = wasBorn.AsSpan().IndexOfAny(s_myChars);
@@ -96,6 +115,14 @@ internal partial class Program
                             { 
                                 var abtIndex = wasBorn.Contains("ABT") ? 4 : 0;
                                 spouse.IncompleteBirthDate = wasBorn.Substring(birthDateIndex - abtIndex).Replace(",", "");
+                                bIndex = ssArray.FindIndex(x => x.Contains(" born "));
+                                if (bIndex != -1 && bIndex + 1 < ssArray.Count) 
+                                {
+                                    if (ssArray[bIndex + 1].Contains('|')) 
+                                    {
+                                        spouse.BirthLocation = ssArray[bIndex + 1].Replace("|", ",").TrimStart().TrimEnd(',');
+                                    }
+                                }
                             }
                         }
                     }
@@ -108,14 +135,22 @@ internal partial class Program
                         {
                             var abtIndex = died.Contains("ABT") ? 4 : 0;
                             spouse.IncompleteDeathDate = died.Substring(deathDateIndex - abtIndex).Replace(",", "");
+                            bIndex = ssArray.FindIndex(x => x.Contains(" died "));
+                            if (bIndex != -1 && bIndex + 1 < ssArray.Count) 
+                            {
+                                if (ssArray[bIndex + 1].Contains('|')) 
+                                {
+                                    spouse.BirthLocation = ssArray[bIndex + 1].Replace("|", ",").TrimStart().TrimEnd(',');
+                                }
+                            }
                         }
                     }
                     index = ssArray.TakeWhile(t => !t.Contains("died " )).Count();
-                    if (index == ssArray.Length)
+                    if (index == ssArray.Count)
                     {
                         spouse.DeathLocation = "";
                     }
-                    else if (index + 1 < ssArray.Length)
+                    else if (index + 1 < ssArray.Count)
                     {
                         spouse.DeathLocation = ssArray[index + 1].TrimStart().TrimEnd();
                     }
@@ -236,15 +271,19 @@ internal partial class Program
         var indexM = lineArray.FindIndex(x => x.Contains("married"));
         for (var j = indexM; j < lineArray.Count; j++)
             if (indexM > 0 && !string.IsNullOrEmpty(lineArray[j]))
-                if (lineArray[j].Contains("born " ))
+                if (lineArray[j].Contains(" born " ))
                 {
-                    var bornIndex = lineArray[j].IndexOf("born " );
+                    var bornIndex = lineArray[j].IndexOf(" born " );
                     spouse.IncompleteBirthDate = lineArray[j].Substring(bornIndex + 4).Trim();
+                    if (lineArray.Count < j + 1 && lineArray[j +1].Contains('|'))
+                    spouse.BirthLocation = lineArray[j + 1].Replace("|", ",").TrimStart().TrimEnd(',');
                 }
                 else if (lineArray[j].Contains("died " ))
                 {
                     var diedIndex = lineArray[j].IndexOf("died " );
                     spouse.IncompleteDeathDate = lineArray[j].Substring(diedIndex + 4).Trim();
+                    if (lineArray.Count < j + 1 && lineArray[j +1].Contains('|'))
+                    spouse.DeathLocation = lineArray[j + 1].Replace("|", ",").TrimStart().TrimEnd(',');
                 }
     }
 
@@ -307,7 +346,7 @@ internal partial class Program
         family.Marriage = new()
         {
             MarriageDate = marriageDate,
-            MarriagePlace = marriagePlace.TrimStart()
+            MarriagePlace = marriagePlace.TrimStart().Replace("|", ",")
         };
         var children = person.Children;
         family.Children = [];
