@@ -25,7 +25,7 @@ internal partial class Program
             var person = new Person();
             if (GetGen().IsMatch(line))
                 person.Indi = $"@I{i}@ INDI";
-            
+
             string lineText = line.Substring(0, line.Length); //3, 7, 11, , 16
             person = GetFullName(line, person);
             var sex = GetSex().Match(line).Value;
@@ -34,7 +34,7 @@ internal partial class Program
             person = GetBirthOrDeathdInfo(lineList, person, "born");
             person = GetBirthOrDeathdInfo(lineList, person, "died");
             person = GetPartnerInfo(line, person, TheFile, i);
-            
+
             People.Add(person);
             i++;
             Indi++;
@@ -42,7 +42,14 @@ internal partial class Program
 
         Console.WriteLine(Indi);
         Console.WriteLine(People.Count);
-        
+
+        AttachChildrenToParents();
+
+        ProduceGedcom();
+    }
+
+    private static void AttachChildrenToParents()
+    {
         foreach (var person in People)
         {
             if (person.FamilySpouse == null)
@@ -51,18 +58,18 @@ internal partial class Program
             foreach (var familySpouse in person.FamilySpouse)
             {
                 var fs = familySpouse.Replace("1 FAMS @F", "").Replace("@", "");
-                var children = person.FamilySpouse.Count > 1 
+                var children = person.FamilySpouse.Count > 1
                 ? person.Children.Where(x => x.Contains($"F{fs}"))
                 : person.Children;
-                
-                foreach(var theChild in children)
+
+                foreach (var theChild in children)
                 {
                     var childsIndi = theChild.Replace("1 CHIL ", "").Replace($" F{fs}", "");
                     var personsChild = People.FirstOrDefault(x => x.Indi!.Contains(childsIndi));
                     if (personsChild != null)
                         personsChild.ChildOfFamily = $"1 FAMC @F{fs}@";
                 }
-                
+
                 foreach (var child in person.Children.Where(x => x.Contains($"F{fs}")))
                 {
                     allTheChildren.Add(child.Replace($"F{fs}", "").Trim());
@@ -72,11 +79,10 @@ internal partial class Program
             {
                 person.Children = [];
                 person.Children.AddRange(allTheChildren);
-            }  
+            }
         }
-        
-        ProduceGedcom();
     }
+
     private static Person GetPartnerInfo(string line, Person person, string[] theFile, int lineNumber)
     {
         int marriageNumber = 1;
@@ -169,7 +175,6 @@ internal partial class Program
         }
         return person;
     }
-
     private static Person AddSpouseParents(Person spouse, List<string> info)
     {
         var index = info.FindIndex(x => x.Contains("son of") || x.Contains("daughter of"));
@@ -201,7 +206,6 @@ internal partial class Program
         }
         return spouse;
     }
-
     private static Family CreateFamily(List<Person> parents, string indi)
     {
         var family = new Family
@@ -215,7 +219,6 @@ internal partial class Program
         family.Children.Add($"1 CHIL {indi.Replace("INDI", "")}");
         return family;
     }
-    
     private static Person GetSpouseBirthDateDeathDateAndLocation(Person spouse, List<string> info)
     {
         var index = info.FindIndex(x => x.Contains("born"));
@@ -238,7 +241,6 @@ internal partial class Program
         }
         return spouse;
     }
-    
     private static Person GetSpouseNameAndMarriedDate(Person spouse, string marriageInfo)
     {
         var marriageDateIndex = GetDate().Match(marriageInfo).Index;
@@ -305,7 +307,6 @@ internal partial class Program
         return children;
         
     }
-
     public static Family CreateFamily(string line, Person person, int familyNumber, string spouseIndi)
     {
         var family = new Family
@@ -349,7 +350,6 @@ internal partial class Program
         }
         return family;
     }
-    
     public static string GetDate(string line, string dateType)
     {
         string? date = string.Empty; 
@@ -440,9 +440,7 @@ internal partial class Program
             outputFile.WriteLine($"1 BIRT");
             
             if (!string.IsNullOrEmpty(pers.BirthDate))
-            {
                 outputFile.WriteLine($"2 DATE {pers.BirthDate}");
-            }
             if (!string.IsNullOrEmpty(pers.BirthLocation))
             {
                 outputFile.WriteLine($"2 PLAC {pers.BirthLocation}");
